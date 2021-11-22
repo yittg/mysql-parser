@@ -356,6 +356,7 @@ import (
 	csvNull               "CSV_NULL"
 	csvSeparator          "CSV_SEPARATOR"
 	csvTrimLastSeparators "CSV_TRIM_LAST_SEPARATORS"
+	cube                  "CUBE"
 	current               "CURRENT"
 	clustered             "CLUSTERED"
 	cycle                 "CYCLE"
@@ -404,6 +405,7 @@ import (
 	general               "GENERAL"
 	global                "GLOBAL"
 	grants                "GRANTS"
+	grouping              "GROUPING"
 	hash                  "HASH"
 	help                  "HELP"
 	histogram             "HISTOGRAM"
@@ -530,6 +532,7 @@ import (
 	reverse               "REVERSE"
 	role                  "ROLE"
 	rollback              "ROLLBACK"
+	rollup                "ROLLUP"
 	routine               "ROUTINE"
 	rowCount              "ROW_COUNT"
 	rowFormat             "ROW_FORMAT"
@@ -546,6 +549,7 @@ import (
 	serial                "SERIAL"
 	serializable          "SERIALIZABLE"
 	session               "SESSION"
+	sets                  "SETS"
 	setval                "SETVAL"
 	shardRowIDBits        "SHARD_ROW_ID_BITS"
 	share                 "SHARE"
@@ -1001,6 +1005,8 @@ import (
 	GetFormatSelector                      "{DATE|DATETIME|TIME|TIMESTAMP}"
 	GlobalScope                            "The scope of variable"
 	GroupByClause                          "GROUP BY clause"
+	GroupByItem                            "GROUP BY item"
+	GroupByList                            "GROUP BY list"
 	HavingClause                           "HAVING clause"
 	AsOfClause                             "AS OF clause"
 	AsOfClauseOpt                          "AS OF clause optional"
@@ -1333,6 +1339,7 @@ import (
 	EncryptionOpt     "Encryption option 'Y' or 'N'"
 	FirstOrNext       "FIRST or NEXT"
 	RowOrRows         "ROW or ROWS"
+	GroupByModifier   "GROUP BY Item Modifier"
 
 %type	<ident>
 	Identifier                      "identifier or unreserved keyword"
@@ -5398,10 +5405,57 @@ FieldList:
 	}
 
 GroupByClause:
-	"GROUP" "BY" ByList
+	"GROUP" "BY" GroupByList
 	{
-		$$ = &ast.GroupByClause{Items: $3.([]*ast.ByItem)}
+		$$ = &ast.GroupByClause{Items: $3.([]ast.GroupByItem)}
 	}
+
+GroupByList:
+	GroupByItem
+	{
+		$$ = []ast.GroupByItem{$1.(ast.GroupByItem)}
+	}
+|	GroupByList ',' GroupByItem
+	{
+		$$ = append($1.([]ast.GroupByItem), $3.(ast.GroupByItem))
+	}
+
+GroupByItem:
+	"GROUPING" "SETS" '(' GroupByList ')'
+	{
+		$$ = &ast.GroupSets{
+			Name: "GROUPING SETS",
+			Sets: $4.([]ast.GroupByItem),
+		}
+	}
+|	GroupByModifier '(' ExpressionList ')'
+	{
+		exprList := $3.([]ast.ExprNode)
+		sets := make([]ast.GroupByItem, len(exprList))
+		for i := range exprList {
+			sets[i] = &ast.ExprGroupByItem{
+				Expr: exprList[i],
+			}
+		}
+		$$ = &ast.GroupSets{
+			Name: strings.ToUpper($1),
+			Sets: sets,
+		}
+	}
+|	Expression
+	{
+		$$ = &ast.ExprGroupByItem{
+			Expr: $1,
+		}
+	}
+|	'(' ')'
+	{
+		$$ = &ast.EmptyGroupSet{}
+	}
+
+GroupByModifier:
+	"CUBE"
+|	"ROLLUP"
 
 HavingClause:
 	{
@@ -5647,6 +5701,7 @@ UnReservedKeyword:
 |	"COMPRESSED"
 |	"CONSISTENCY"
 |	"CONSISTENT"
+|	"CUBE"
 |	"CURRENT"
 |	"DATA"
 |	"DATE" %prec lowerThanStringLitToken
@@ -5678,6 +5733,7 @@ UnReservedKeyword:
 |	"FULL"
 |	"GENERAL"
 |	"GLOBAL"
+|	"GROUPING"
 |	"HASH"
 |	"HELP"
 |	"HOUR"
@@ -5701,6 +5757,7 @@ UnReservedKeyword:
 |	"RESTART"
 |	"ROLE"
 |	"ROLLBACK"
+|	"ROLLUP"
 |	"SESSION"
 |	"SIGNED"
 |	"SHARD_ROW_ID_BITS"
@@ -5797,6 +5854,7 @@ UnReservedKeyword:
 |	"QUERIES"
 |	"SECOND"
 |	"SEPARATOR"
+|	"SETS"
 |	"SHARE"
 |	"SHARED"
 |	"SLOW"

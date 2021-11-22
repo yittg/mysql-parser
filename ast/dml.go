@@ -833,7 +833,7 @@ func (n *ByItem) Accept(v Visitor) (Node, bool) {
 // GroupByClause represents group by clause.
 type GroupByClause struct {
 	node
-	Items []*ByItem
+	Items []GroupByItem
 }
 
 // Restore implements Node interface.
@@ -862,10 +862,126 @@ func (n *GroupByClause) Accept(v Visitor) (Node, bool) {
 		if !ok {
 			return n, false
 		}
-		n.Items[i] = node.(*ByItem)
+		n.Items[i] = node.(GroupByItem)
 	}
 	return v.Leave(n)
 }
+
+// GroupByItem is an operand node of GroupByClause
+type GroupByItem interface {
+	Node
+
+	groupBy()
+}
+
+// ExprGroupByItem is an expression GroupByItem node
+type ExprGroupByItem struct {
+	node
+	Expr ExprNode
+}
+
+// Restore implements Node interface.
+func (n *ExprGroupByItem) Restore(ctx *format.RestoreCtx) error {
+	if rowExpr, ok := n.Expr.(*RowExpr); ok {
+		ctx.WritePlain("(")
+		for i, v := range rowExpr.Values {
+			if i != 0 {
+				ctx.WritePlain(",")
+			}
+			if err := v.Restore(ctx); err != nil {
+				return errors.Annotatef(err,
+					"An error occurred while restore RowExpr.Values[%d]", i)
+			}
+		}
+		ctx.WritePlain(")")
+		return nil
+	}
+	return n.Expr.Restore(ctx)
+}
+
+// Accept implements Node Accept interface.
+func (n *ExprGroupByItem) Accept(v Visitor) (node Node, ok bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*ExprGroupByItem)
+	node, ok = n.Expr.Accept(v)
+	if !ok {
+		return n, false
+	}
+	n.Expr = node.(ExprNode)
+	return v.Leave(n)
+}
+
+func (n *ExprGroupByItem) groupBy() {}
+
+// GroupSets is a normal GroupByItem node
+type GroupSets struct {
+	node
+
+	Name string
+	Sets []GroupByItem
+}
+
+// Restore implements Node interface.
+func (n *GroupSets) Restore(ctx *format.RestoreCtx) error {
+	ctx.WriteKeyWord(n.Name)
+	ctx.WritePlain(" (")
+	for i, v := range n.Sets {
+		if i != 0 {
+			ctx.WritePlain(",")
+		}
+		if err := v.Restore(ctx); err != nil {
+			return errors.Annotatef(err,
+				"An error occurred while restore GroupingSets.Sets[%d]", i)
+		}
+	}
+	ctx.WritePlain(")")
+	return nil
+}
+
+// Accept implements Node Accept interface.
+func (n *GroupSets) Accept(v Visitor) (node Node, ok bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*GroupSets)
+	for i, val := range n.Sets {
+		node, ok := val.Accept(v)
+		if !ok {
+			return n, false
+		}
+		n.Sets[i] = node.(GroupByItem)
+	}
+	return v.Leave(n)
+}
+
+func (n *GroupSets) groupBy() {}
+
+// EmptyGroupSet is an empty GroupByItem node
+type EmptyGroupSet struct {
+	node
+}
+
+// Restore implements Node interface.
+func (n *EmptyGroupSet) Restore(ctx *format.RestoreCtx) error {
+	ctx.WritePlain("()")
+	return nil
+}
+
+// Accept implements Node Accept interface.
+func (n *EmptyGroupSet) Accept(v Visitor) (node Node, ok bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*EmptyGroupSet)
+	return v.Leave(n)
+}
+
+func (n *EmptyGroupSet) groupBy() {}
 
 // HavingClause represents having clause.
 type HavingClause struct {

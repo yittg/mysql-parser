@@ -39,7 +39,7 @@ func (ts *testDMLSuite) TestDMLVisitorCover(c *C) {
 		{&LoadDataStmt{Table: &TableName{}, Columns: []*ColumnName{{}}, FieldsInfo: &FieldsClause{}, LinesInfo: &LinesClause{}}, 0, 0},
 		{&Assignment{Column: &ColumnName{}, Expr: ce}, 1, 1},
 		{&ByItem{Expr: ce}, 1, 1},
-		{&GroupByClause{Items: []*ByItem{{Expr: ce}, {Expr: ce}}}, 2, 2},
+		{&GroupByClause{Items: []GroupByItem{&ExprGroupByItem{Expr: ce}, &ExprGroupByItem{Expr: ce}}}, 2, 2},
 		{&HavingClause{Expr: ce}, 1, 1},
 		{&Join{Left: &TableSource{Source: &TableName{}}}, 0, 0},
 		{&Limit{Count: ce, Offset: ce}, 2, 2},
@@ -295,8 +295,8 @@ func (tc *testExpressionsSuite) TestByItemRestore(c *C) {
 
 func (tc *testExpressionsSuite) TestGroupByClauseRestore(c *C) {
 	testCases := []NodeRestoreTestCase{
-		{"GROUP BY a,b desc", "GROUP BY `a`,`b` DESC"},
-		{"GROUP BY 1 desc,b", "GROUP BY 1 DESC,`b`"},
+		{"GROUP BY a,b", "GROUP BY `a`,`b`"},
+		{"GROUP BY 1 ,b", "GROUP BY 1,`b`"},
 	}
 	extractNodeFunc := func(node Node) Node {
 		return node.(*SelectStmt).GroupBy

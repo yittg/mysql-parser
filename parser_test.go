@@ -869,6 +869,19 @@ func (s *testParserSuite) TestDMLStmt(c *C) {
 		//https://github.com/pingcap/tidb/issues/24496
 		{"select 1 group by 1", true, "SELECT 1 GROUP BY 1"},
 		{"select 1 from dual group by 1", true, "SELECT 1 GROUP BY 1"},
+		{"select 1 group by ()", true, "SELECT 1 GROUP BY ()"},
+		{"select 1 group by a, b", true, "SELECT 1 GROUP BY `a`,`b`"},
+		{"select 1 group by grouping sets (())", true, "SELECT 1 GROUP BY GROUPING SETS (())"},
+		{"select 1 group by grouping sets (1, 2)", true, "SELECT 1 GROUP BY GROUPING SETS (1,2)"},
+		{"select 1 group by grouping sets (a, b)", true, "SELECT 1 GROUP BY GROUPING SETS (`a`,`b`)"},
+		{"select 1 group by grouping sets ((a,b))", true, "SELECT 1 GROUP BY GROUPING SETS ((`a`,`b`))"},
+		{"select 1 group by grouping sets ((a,b), ())", true, "SELECT 1 GROUP BY GROUPING SETS ((`a`,`b`),())"},
+		{"select 1 group by rollup (a,b)", true, "SELECT 1 GROUP BY ROLLUP (`a`,`b`)"},
+		{"select 1 group by rollup (1,2)", true, "SELECT 1 GROUP BY ROLLUP (1,2)"},
+		{"select 1 group by grouping sets (rollup (a,b))", true, "SELECT 1 GROUP BY GROUPING SETS (ROLLUP (`a`,`b`))"},
+		{"select 1 group by cube (a,b)", true, "SELECT 1 GROUP BY CUBE (`a`,`b`)"},
+		{"select 1 group by cube (1,2)", true, "SELECT 1 GROUP BY CUBE (1,2)"},
+		{"select 1 group by grouping sets (cube (a,b))", true, "SELECT 1 GROUP BY GROUPING SETS (CUBE (`a`,`b`))"},
 
 		// for https://github.com/pingcap/parser/issues/963
 		{"select min(b) b from (select min(t.b) b from t where t.a = '');", true, "SELECT MIN(`b`) AS `b` FROM (SELECT MIN(`t`.`b`) AS `b` FROM `t` WHERE `t`.`a`=_UTF8MB4'')"},
